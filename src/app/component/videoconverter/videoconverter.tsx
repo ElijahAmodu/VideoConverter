@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+import type React from "react";
+import { useState, useRef } from "react";
 import {
   Upload,
   Download,
@@ -7,17 +8,25 @@ import {
   CheckCircle,
 } from "lucide-react";
 
+interface ConvertedFile {
+  blob: Blob;
+  name: string;
+  url: string;
+}
+
 const VideoConverter = () => {
-  const [file, setFile] = useState(null);
+  const [file, setFile] = useState<File | null>(null);
   const [outputFormat, setOutputFormat] = useState("mp4");
   const [isLoading, setIsLoading] = useState(false);
   const [isFFmpegLoaded, setIsFFmpegLoaded] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [convertedFile, setConvertedFile] = useState(null);
+  const [convertedFile, setConvertedFile] = useState<ConvertedFile | null>(
+    null
+  );
   const [error, setError] = useState("");
-  const [logs, setLogs] = useState([]);
-  const ffmpegRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const ffmpegRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize FFmpeg
   const loadFFmpeg = async () => {
@@ -32,14 +41,16 @@ const VideoConverter = () => {
       const { fetchFile } = await import("@ffmpeg/util");
 
       ffmpegRef.current = new FFmpeg();
-
-      ffmpegRef.current.on("log", ({ message }) => {
+      ffmpegRef.current.on("log", ({ message }: { message: string }) => {
         setLogs((prev) => [...prev.slice(-10), message]);
       });
 
-      ffmpegRef.current.on("progress", ({ progress: ratio }) => {
-        setProgress(Math.round(ratio * 100));
-      });
+      ffmpegRef.current.on(
+        "progress",
+        ({ progress: ratio }: { progress: number }) => {
+          setProgress(Math.round(ratio * 100));
+        }
+      );
 
       // Load FFmpeg with CDN URLs
       await ffmpegRef.current.load({
@@ -54,15 +65,16 @@ const VideoConverter = () => {
       setIsFFmpegLoaded(true);
       setLogs((prev) => [...prev, "FFmpeg loaded successfully!"]);
     } catch (err) {
-      setError("Failed to load FFmpeg: " + err.message);
-      setLogs((prev) => [...prev, "Error loading FFmpeg: " + err.message]);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setError(`Failed to load FFmpeg: ${errorMsg}`);
+      setLogs((prev) => [...prev, `Error loading FFmpeg: ${errorMsg}`]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFileSelect = (event) => {
-    const selectedFile = event.target.files[0];
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       setConvertedFile(null);
@@ -83,7 +95,7 @@ const VideoConverter = () => {
 
       const { fetchFile } = await import("@ffmpeg/util");
       const ffmpeg = ffmpegRef.current;
-      const inputName = "input." + file.name.split(".").pop();
+      const inputName = `input.${file.name.split(".").pop()}`;
       const outputName = `output.${outputFormat}`;
 
       // Write input file to FFmpeg file system
@@ -132,14 +144,15 @@ const VideoConverter = () => {
 
       setConvertedFile({
         blob,
-        name: file.name.split(".")[0] + "." + outputFormat,
+        name: `${file.name.split(".")[0]} .  ${outputFormat}`,
         url: URL.createObjectURL(blob),
       });
 
       setLogs((prev) => [...prev, "Conversion completed successfully!"]);
     } catch (err) {
-      setError("Conversion failed: " + err.message);
-      setLogs((prev) => [...prev, "Error: " + err.message]);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setError(`Failed to load FFmpeg: ${errorMsg}`);
+      setLogs((prev) => [...prev, `Error loading FFmpeg: ${errorMsg}`]);
     } finally {
       setIsLoading(false);
       setProgress(0);
@@ -168,12 +181,12 @@ const VideoConverter = () => {
     }
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    return `${Number.parseFloat((bytes / k ** i).toFixed(2))}  ${sizes[i]}`;
   };
 
   return (
@@ -191,13 +204,14 @@ const VideoConverter = () => {
       {!isFFmpegLoaded && (
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <button
+            type="button"
             onClick={loadFFmpeg}
             disabled={isLoading}
             className="w-full py-3 px-6 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isLoading ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                 Loading FFmpeg...
               </>
             ) : (
@@ -237,7 +251,7 @@ const VideoConverter = () => {
 
       {/* File Info */}
       {file && (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="mb-6 p-4 bg-green-100 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-gray-800">{file.name}</p>
@@ -246,6 +260,7 @@ const VideoConverter = () => {
               </p>
             </div>
             <button
+              type="button"
               onClick={resetConverter}
               className="p-2 text-gray-400 hover:text-gray-600"
             >
@@ -258,13 +273,17 @@ const VideoConverter = () => {
       {/* Format Selection */}
       {file && (
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            htmlFor="output-format"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
             Output Format
           </label>
           <select
+            id="output-format"
             value={outputFormat}
             onChange={(e) => setOutputFormat(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full text-gray-700 p-3 border border-gray-300 rounded-lg focus:ring-0 focus:ring-blue-500 focus:border-blue-500 "
           >
             <option value="mp4">MP4 (H.264)</option>
             <option value="webm">WebM (VP9)</option>
@@ -279,13 +298,14 @@ const VideoConverter = () => {
       {file && isFFmpegLoaded && (
         <div className="mb-6">
           <button
+            type="button"
             onClick={convertVideo}
             disabled={isLoading}
             className="w-full py-3 px-6 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isLoading ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                 Converting...
               </>
             ) : (
@@ -306,7 +326,7 @@ const VideoConverter = () => {
             <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
-            ></div>
+            />
           </div>
         </div>
       )}
@@ -336,6 +356,7 @@ const VideoConverter = () => {
               </p>
             </div>
             <button
+              type="button"
               onClick={downloadFile}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
