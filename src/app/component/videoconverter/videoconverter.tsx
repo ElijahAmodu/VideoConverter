@@ -1,5 +1,5 @@
-import type React from "react";
 import { useState, useRef } from "react";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
 import {
   Upload,
   Download,
@@ -25,13 +25,13 @@ const VideoConverter = () => {
   );
   const [error, setError] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
-  const ffmpegRef = useRef<any>(null);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
+  // const ffmpegRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize FFmpeg
   const loadFFmpeg = async () => {
     if (isFFmpegLoaded) return;
-
     try {
       setIsLoading(true);
       setLogs((prev) => [...prev, "Loading FFmpeg..."]);
@@ -95,6 +95,11 @@ const VideoConverter = () => {
 
       const { fetchFile } = await import("@ffmpeg/util");
       const ffmpeg = ffmpegRef.current;
+      if (!ffmpeg) {
+        setError("FFmpeg is not initialized.");
+        setIsLoading(false);
+        return;
+      }
       const inputName = `input.${file.name.split(".").pop()}`;
       const outputName = `output.${outputFormat}`;
 
@@ -140,11 +145,19 @@ const VideoConverter = () => {
 
       // Read the output file
       const data = await ffmpeg.readFile(outputName);
-      const blob = new Blob([data.buffer], { type: `video/${outputFormat}` });
+      let uint8Data: Uint8Array;
+      if (data instanceof Uint8Array) {
+        uint8Data = data;
+      } else if (typeof data === "string") {
+        uint8Data = new TextEncoder().encode(data);
+      } else {
+        uint8Data = new Uint8Array(data as ArrayBuffer);
+      }
+      const blob = new Blob([uint8Data], { type: `video/${outputFormat}` });
 
       setConvertedFile({
         blob,
-        name: `${file.name.split(".")[0]} .  ${outputFormat}`,
+        name: `${file.name.split(".")[0]}.${outputFormat}`,
         url: URL.createObjectURL(blob),
       });
 
